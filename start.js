@@ -27,59 +27,52 @@ async function readCSV(filePath) {
     return results;
 }
 
-function getCachedSprites(folderPath) {
-    return fs.promises.readdir(folderPath).then(files => {
-        return files.reduce((cache, file) => {
-            const [id] = file.split('.');
-            cache[id] = file;
-            return cache;
-        }, {});
-    });
+function getSpritesForId(id, folderPath) {
+    const files = fs.readdirSync(folderPath);
+    const regex = new RegExp(`^${id}[a-z]?\\.png$`);
+    return files.filter(file => regex.test(file));
 }
 
-async function processSprites(pokemonList, spriteCredits, type, spriteCache) {
+function processSprites(pokemonList, spriteCredits, type) {
     const folderPath = SPRITE_FOLDERS[type];
     
     for (const pokemon of pokemonList) {
         const id = pokemon.id;
-        console.log(`Processing Sprites for ID: ${id}`);
+        const sprites = getSpritesForId(id, folderPath);
+        let primaryImage, alternativeSprites = [];
 
-        const primarySprite = spriteCache[id] || null;
-        const alternativeSprites = [];
+        if (sprites.length > 0) {
+            // For primary image: check full ID in CSV, fallback to just number if needed
+            const credit = spriteCredits.find(c => c.id === id) || 
+                           spriteCredits.find(c => c.id === id.split('.').pop());
 
-        // Find sprite credits
-        const credit = spriteCredits.find(c => c.id === id) || 
-                       spriteCredits.find(c => c.id === id.split('.').pop());
-
-        if (primarySprite) {
-            pokemon.primary_image = {
-                url: path.join(folderPath, primarySprite),
+            primaryImage = {
+                url: path.join(folderPath, `${id}.png`),
                 artist: credit ? credit.artist.split(' & ') : []
             };
 
-            alternativeSprites.push(pokemon.primary_image);
-        }
-
-        // Handle alternative sprites
-        const allSprites = Object.values(spriteCache).filter(file => file.startsWith(id));
-        for (const sprite of allSprites) {
-            const spriteId = path.parse(sprite).name;
-            const spriteCredit = spriteCredits.find(c => c.id === spriteId) || 
-                                 spriteCredits.find(c => c.id === spriteId.replace(/[a-z]$/, ''));
-            alternativeSprites.push({
-                url: path.join(folderPath, sprite),
-                artist: spriteCredit ? spriteCredit.artist.split(' & ') : []
+            alternativeSprites = sprites.map(sprite => {
+                const spriteId = path.parse(sprite).name;
+                const spriteCredit = spriteCredits.find(c => c.id === spriteId) || 
+                                     spriteCredits.find(c => c.id === spriteId.replace(/[a-z]$/, ''));
+                return {
+                    url: path.join(folderPath, sprite),
+                    artist: spriteCredit ? spriteCredit.artist.split(' & ') : []
+                };
             });
         }
 
-        if (type === 'fusion' && !primarySprite) {
-            pokemon.primary_image = {
+        // If no custom sprites are available and type is fusion, use autogen
+        if (type === 'fusion' && !primaryImage) {
+            primaryImage = {
                 url: path.join(AUTOGEN_FOLDER, id.split('.')[0], `${id}.png`),
                 artist: ['Jeapal Fusion Calculator']
             };
-            alternativeSprites.push(pokemon.primary_image);
+            alternativeSprites.push(primaryImage);
         }
 
+        // Assign primary and alternative sprites to the Pokémon object
+        pokemon.primary_image = primaryImage;
         pokemon.alternative_sprites = alternativeSprites;
     }
 }
@@ -90,19 +83,14 @@ async function main() {
         const spriteCredits = await readCSV(SPRITE_CREDITS_PATH);
         console.log(`Read ${spriteCredits.length} sprite credit entries.`);
         
-        // Caching sprite files
-        const baseSpriteCache = await getCachedSprites(SPRITE_FOLDERS.base);
-        const fusionSpriteCache = await getCachedSprites(SPRITE_FOLDERS.fusion);
-        const tripleSpriteCache = await getCachedSprites(SPRITE_FOLDERS.triple);
-
         console.log("Processing base Pokémon sprites...");
-        await processSprites(base, spriteCredits, 'base', baseSpriteCache);
+        processSprites(base, spriteCredits, 'base');
         
         console.log("Processing fusion Pokémon sprites...");
-        await processSprites(fusions, spriteCredits, 'fusion', fusionSpriteCache);
+        processSprites(fusions, spriteCredits, 'fusion');
         
         console.log("Processing triple Pokémon sprites...");
-        await processSprites(triples, spriteCredits, 'triple', tripleSpriteCache);
+        processSprites(triples, spriteCredits, 'triple');
         
         console.log("Extracting evolutions...");
         const baseEvolutions = extractEvolutions(base);
@@ -130,10 +118,8 @@ async function main() {
             }
             writeStream.write(jsonEntry);
 
-            console.log(`Processed Pokémon with ID: ${key} (${i + 1}/${pokemonEntries.length})`);
-
             if (i % 1000 === 0) {
-                writeStream.write('\n');  // Flush buffer to avoid memory issues
+                console.log(`Processed ${i} entries...`);
             }
         }
 
