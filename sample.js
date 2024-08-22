@@ -1,141 +1,208 @@
-import { base, fusions, triples } from "./lib/loadPokemon.js";
 import fs from 'fs/promises';
+import path from 'path';
+import sqlite3 from 'sqlite3';
+import { open } from 'sqlite';
 
-/**
- * @typedef {{
- *   id: string,
- *   name: string,
- *   evolvesFrom: Array<{
- *     id: string,
- *     name: string,
- *     target: string,
- *     method: string,
- *     param: string
- *   }>,
- *   evolvesTo: Array<{
- *     id: string,
- *     name: string,
- *     target: string,
- *     method: string,
- *     param: string
- *   }>,
- *   evolutionChain: Array<{
- *     id: string,
- *     name: string,
- *     target: string,
- *     method: string,
- *     param: string
- *   }>
- * }} PokemonEvolution
- */
+const SPRITE_CREDITS_PATH = './lib/data/Sprite Credits.csv';
+const DB_PATH = './pokemon_data.db';
+const CHUNK_SIZE = 1000;
 
-/**
- * @param {Pokemon[]} pokemonList 
- * @returns {Map<string, PokemonEvolution>}
- */
-function extractEvolutions(pokemonList) {
-    /** @type {Map<string, PokemonEvolution>} */
-    const evolutionMap = new Map();
+async function initializeDatabase(db) {
+    await db.exec(`
+        CREATE TABLE IF NOT EXISTS base_sprites (
+            id TEXT PRIMARY KEY,
+            name TEXT,
+            category TEXT,
+            pokedex_entry TEXT,
+            primary_type TEXT,
+            secondary_type TEXT,
+            base_hp INTEGER,
+            base_atk INTEGER,
+            base_def INTEGER,
+            base_sp_atk INTEGER,
+            base_sp_def INTEGER,
+            base_spd INTEGER,
+            ev_hp INTEGER,
+            ev_atk INTEGER,
+            ev_def INTEGER,
+            ev_sp_atk INTEGER,
+            ev_sp_def INTEGER,
+            ev_spd INTEGER,
+            base_exp INTEGER,
+            growth_rate TEXT,
+            gender_ratio TEXT,
+            catch_rate INTEGER,
+            happiness INTEGER,
+            egg_groups JSON,
+            hatch_steps INTEGER,
+            height INTEGER,
+            weight INTEGER,
+            color TEXT,
+            shape TEXT,
+            habitat TEXT,
+            back_sprite_x INTEGER,
+            back_sprite_y INTEGER,
+            front_sprite_x INTEGER,
+            front_sprite_y INTEGER,
+            front_sprite_a INTEGER,
+            shadow_x INTEGER,
+            shadow_size INTEGER,
+            moves JSON,
+            tutor_moves JSON,
+            egg_moves JSON,
+            abilities JSON,
+            hidden_abilities JSON,
+            primary_image JSON,
+            alternative_sprites JSON,
+            total_variants INTEGER,
+            evolves_from JSON,
+            evolves_to JSON,
+            evolution_chain JSON,
+            fusion_from_head JSON,
+            fusion_from_body JSON,
+            triple_fusion JSON
+        );
 
-    for (const pokemon of pokemonList) {
-        evolutionMap.set(pokemon.id, {
-            id: pokemon.id,
-            name: pokemon.name,
-            evolvesFrom: [],
-            evolvesTo: pokemon.evolutions.map(evo => ({
-                id: evo.target,
-                name: "", // Placeholder, will be filled later
-                target: evo.target,
-                method: evo.method,
-                param: evo.param
+        CREATE TABLE IF NOT EXISTS artists (
+            artist_name TEXT PRIMARY KEY,
+            total_sprites INTEGER,
+            sprites_data JSON
+        );
+    `);
+}
+
+async function readCSV(filePath) {
+    const fileContent = await fs.readFile(filePath, 'utf-8');
+    return fileContent.split('\n').map(line => {
+        const [id, artist, type, notes] = line.split(',');
+        return { id, artist, type, notes };
+    });
+}
+
+async function processBaseSprites(db) {
+    const baseSprites = await db.all('SELECT * FROM sprites WHERE id NOT LIKE "%.%" AND id NOT LIKE "%-%"');
+
+    for (const baseSprite of baseSprites) {
+        const fusionsAsHead = await db.all('SELECT id, name, primary_image, alternative_sprites FROM sprites WHERE id LIKE ?', `${baseSprite.id}.%`);
+        const fusionsAsBody = await db.all('SELECT id, name, primary_image, alternative_sprites FROM sprites WHERE id LIKE ?', `%.${baseSprite.id}`);
+        const tripleFusions = await db.all('SELECT id, name, primary_image, alternative_sprites FROM sprites WHERE id LIKE ?', `%-${baseSprite.id}-%`);
+ 
+        const baseSpriteData = {
+            ...baseSprite,
+            fusion_from_head: fusionsAsHead.map(f => ({
+                name: f.name,
+                id: f.id,
+                image: JSON.parse(f.primary_image).url,
+                total_variants: JSON.parse(f.alternative_sprites).length + 1
             })),
-            evolutionChain: []
-        });
-    }
+            fusion_from_body: fusionsAsBody.map(f => ({
+                name: f.name,
+                id: f.id,
+                image: JSON.parse(f.primary_image).url,
+                total_variants: JSON.parse(f.alternative_sprites).length + 1
+            })),
+            triple_fusion: tripleFusions.map(f => ({
+                name: f.name,
+                id: f.id,
+                image: JSON.parse(f.primary_image).url,
+                total_variants: JSON.parse(f.alternative_sprites).length + 1
+            }))
+        };
+        console.log(baseSpriteData)
+        const columns = Object.keys(baseSpriteData).join(', ');
+        const placeholders = Object.keys(baseSpriteData).map(() => '?').join(', ');
 
-    // Set evolvesFrom and fill in missing names in evolvesTo
-    for (const [id, evo] of evolutionMap) {
-        for (const evolvesToEntry of evo.evolvesTo) {
-            const evolvesTo = evolutionMap.get(evolvesToEntry.id);
-            if (evolvesTo) {
-                evolvesTo.evolvesFrom.push({
-                    id: evo.id,
-                    name: evo.name,
-                    target: evolvesToEntry.target,
-                    method: evolvesToEntry.method,
-                    param: evolvesToEntry.param
-                });
-                evolvesToEntry.name = evolvesTo.name;
-            }
-        }
-    }
+        const stmt = await db.prepare(`
+            INSERT OR REPLACE INTO base_sprites (${columns})
+            VALUES (${placeholders})
+        `);
 
-    // Remove duplicate entries in evolvesFrom and evolvesTo arrays
-    for (const evo of evolutionMap.values()) {
-        evo.evolvesFrom = removeDuplicates(evo.evolvesFrom);
-        evo.evolvesTo = removeDuplicates(evo.evolvesTo);
-    }
+        await stmt.run(...Object.values(baseSpriteData).map(value => 
+            typeof value === 'object' ? JSON.stringify(value) : value
+        ));
 
-    return evolutionMap;
+        await stmt.finalize();
+    }
 }
 
-/**
- * @param {Array} array 
- * @returns {Array}
- */
-function removeDuplicates(array) {
-    return array.filter((item, index, self) =>
-        index === self.findIndex((t) => (
-            t.id === item.id && t.method === item.method && t.param === item.param
-        ))
-    );
-}
+async function processArtists(db, spriteCredits) {
+    const artistData = {};
 
-/**
- * @param {Map<string, PokemonEvolution>} evolutionMap 
- */
-function buildEvolutionChains(evolutionMap) {
-    for (const evo of evolutionMap.values()) {
-        if (evo.evolvesFrom.length === 0) {
-            const chain = [];
-            let current = evo;
-            while (current) {
-                chain.push({
-                    id: current.id,
-                    name: current.name,
-                    target: current.evolvesTo[0]?.target || "",
-                    method: current.evolvesTo[0]?.method || "",
-                    param: current.evolvesTo[0]?.param || ""
-                });
-                current = current.evolvesTo.length > 0 ? evolutionMap.get(current.evolvesTo[0].id) : null;
+    const allSprites = await db.all('SELECT id, name, primary_type, secondary_type, primary_image, alternative_sprites FROM sprites');
+
+    for (const sprite of allSprites) {
+        const primaryImage = JSON.parse(sprite.primary_image);
+        const alternativeSprites = JSON.parse(sprite.alternative_sprites);
+        const allImages = [primaryImage, ...alternativeSprites];
+        
+        for (const image of allImages) {
+            let artists = image.artist;
+            if (!artists || artists.length === 0) {
+                const credit = spriteCredits.find(c => c.id === sprite.id) || 
+                               spriteCredits.find(c => c.id === sprite.id.split('.').pop());
+                artists = credit ? credit.artist.split(' & ') : ['Unknown'];
             }
-            // Assign the full chain to each Pokémon in the chain
-            for (const link of chain) {
-                const pokemon = evolutionMap.get(link.id);
-                if (pokemon) {
-                    pokemon.evolutionChain = removeDuplicates(chain);
+
+            for (const artist of artists) {
+                if (!artistData[artist]) {
+                    artistData[artist] = {
+                        artist_name: artist,
+                        total_sprites: 0,
+                        sprites_data: []
+                    };
                 }
+
+                artistData[artist].total_sprites++;
+                artistData[artist].sprites_data.push({
+                    pokemon_name: sprite.name,
+                    id: sprite.id,
+                    image: image.url,
+                    types: [sprite.primary_type, sprite.secondary_type].filter(Boolean)
+                });
             }
         }
+    }
+
+    for (const [artist, data] of Object.entries(artistData)) {
+        const stmt = await db.prepare(`
+            INSERT OR REPLACE INTO artists (artist_name, total_sprites, sprites_data)
+            VALUES (?, ?, ?)
+        `);
+
+        await stmt.run(
+            artist,
+            data.total_sprites,
+            JSON.stringify(data.sprites_data)
+        );
+
+        await stmt.finalize();
     }
 }
 
 async function main() {
-    const baseEvolutions = extractEvolutions(base);
-    const tripleEvolutions = extractEvolutions(triples);
-    const fusionEvolutions = extractEvolutions(fusions);
-
-    const allEvolutions = new Map([...baseEvolutions, ...tripleEvolutions, ...fusionEvolutions]);
-    buildEvolutionChains(allEvolutions);
-
-    // Convert to a more JSON-friendly format
-    const evolutionData = Object.fromEntries(allEvolutions);
-
     try {
-        await fs.writeFile('evolution_data.json', JSON.stringify(evolutionData, null, 2));
-        console.log('Evolution data saved to evolution_data.json');
+        console.log("Initializing...");
+        const spriteCredits = await readCSV(SPRITE_CREDITS_PATH);
+        console.log(`Read ${spriteCredits.length} sprite credit entries.`);
+
+        const db = await open({
+            filename: DB_PATH,
+            driver: sqlite3.Database
+        });
+
+        await initializeDatabase(db);
+
+        console.log("Processing base sprites...");
+        await processBaseSprites(db);
+
+        console.log("Processing artists...");
+        await processArtists(db, spriteCredits);
+
+        await db.close();
+
+        console.log('Base sprites and artists data saved to SQLite database');
     } catch (error) {
-        console.error('Error writing files:', error);
+        console.error('Error processing data:', error);
     }
 }
 
