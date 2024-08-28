@@ -13,6 +13,7 @@ async function initializeBaseSpritesTable(db) {
             name TEXT,
             category TEXT,
             pokedex_entry TEXT,
+            base_pokemons JSON,
             primary_type TEXT,
             secondary_type TEXT,
             base_hp INTEGER,
@@ -97,11 +98,11 @@ async function processBaseSprite(db, baseSprite) {
         if (fusion) {
             headFusions.push({
                 id: fusion.id,
-                name: fusion.name,
-                primary_type: fusion.primary_type,
-                secondary_type: fusion.secondary_type,
-                total_variants: fusion.total_variants,
-                primary_image: fusion.primary_image
+                // name: fusion.name,
+                // primary_type: fusion.primary_type,
+                // secondary_type: fusion.secondary_type,
+                // total_variants: fusion.total_variants,
+                // primary_image: fusion.primary_image
             });
 
             // Count only custom variants
@@ -119,11 +120,11 @@ async function processBaseSprite(db, baseSprite) {
         if (fusion) {
             bodyFusions.push({
                 id: fusion.id,
-                name: fusion.name,
-                primary_type: fusion.primary_type,
-                secondary_type: fusion.secondary_type,
-                total_variants: fusion.total_variants,
-                primary_image: fusion.primary_image
+                // name: fusion.name,
+                // primary_type: fusion.primary_type,
+                // secondary_type: fusion.secondary_type,
+                // total_variants: fusion.total_variants,
+                // primary_image: fusion.primary_image
             });
 
             // Count only custom variants
@@ -151,7 +152,7 @@ async function processBaseSprite(db, baseSprite) {
 async function insertBaseSpriteData(db, pokemon) {
     const stmt = await db.prepare(`
         INSERT OR REPLACE INTO base_sprites (
-            id, name, category, pokedex_entry, primary_type, secondary_type,
+            id, name, category, pokedex_entry, base_pokemons, primary_type, secondary_type,
             base_hp, base_atk, base_def, base_sp_atk, base_sp_def, base_spd,
             ev_hp, ev_atk, ev_def, ev_sp_atk, ev_sp_def, ev_spd,
             base_exp, growth_rate, gender_ratio, catch_rate, happiness,
@@ -161,7 +162,7 @@ async function insertBaseSpriteData(db, pokemon) {
             egg_moves, abilities, hidden_abilities, primary_image,
             alternative_sprites, total_variants, evolves_from, evolves_to,
             evolution_chain, fusion_as_head, fusion_as_body, total_head_fusions, total_body_fusions
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     await stmt.run(
@@ -169,6 +170,7 @@ async function insertBaseSpriteData(db, pokemon) {
         pokemon.name,
         pokemon.category,
         pokemon.pokedex_entry,
+        JSON.stringify(pokemon.basePokemons),  // Changed order
         pokemon.primary_type,
         pokemon.secondary_type,
         pokemon.base_hp,
