@@ -1,11 +1,8 @@
 {
     "type": "module",
     "dependencies": {
-        "@sqlitecloud/drivers": "^1.0.193",
-        "axios": "^1.7.4",
-        "csv-parser": "^3.0.0",
-        "node-fetch": "^3.3.2",
         "sqlite": "^5.1.1",
-        "sqlite3": "^5.1.7"
+        "sqlite3": "^5.1.7",
+        "wrangler": "^3.72.3"
     }
 }

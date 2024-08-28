@@ -12,7 +12,7 @@ const SPRITE_FOLDERS = {
     triple: './graphics/custom-sprites/Other/Triples'
 };
 const AUTOGEN_FOLDER = './graphics/autogen-sprites';
-const DB_PATH = './pokemon_data.sqlite';
+const DB_PATH = './data.sqlite';
 const CHUNK_SIZE = 1000;
 
 let spriteFiles = {};
@@ -25,6 +25,7 @@ async function initializeDatabase(db) {
             name TEXT,
             category TEXT,
             pokedex_entry TEXT,
+            base_pokemons JSON,
             primary_type TEXT,
             secondary_type TEXT,
             base_hp INTEGER,
@@ -73,6 +74,19 @@ async function initializeDatabase(db) {
     `);
 }
 
+const create_base_pokemon_name = () => {
+    let pokemons = {}
+    for (const pokemon of  base) {
+        pokemons[pokemon.id] = pokemon.name
+    }
+
+    return pokemons
+}
+
+const base_pokemon_name = create_base_pokemon_name()
+
+console.log(base_pokemon_name)
+
 async function readCSV(filePath) {
     const fileContent = await fs.readFile(filePath, 'utf-8');
     return fileContent.split('\n').map(line => {
@@ -92,9 +106,20 @@ function getSpritesForId(id, type) {
     return Array.from(spriteFiles[type]).filter(file => regex.test(file));
 }
 
+function generateBasePokemons(id) {
+    const all_Base_Pokemons = {}
+    const ids = id.split('.')
+    ids.forEach(pokemonId => {
+        all_Base_Pokemons[pokemonId] = base_pokemon_name[pokemonId]
+    });
+    return all_Base_Pokemons
+}
+
 function processSprites(pokemon, type) {
     const folderPath = SPRITE_FOLDERS[type];
     const sprites = getSpritesForId(pokemon.id, type);
+
+    const basePokemons = generateBasePokemons(pokemon.id)
 
     let primaryImage, alternativeSprites = [];
 
@@ -120,19 +145,17 @@ function processSprites(pokemon, type) {
 
     const totalVariants = alternativeSprites.length;
 
-    const autogenSprite = {
-        url: path.join(AUTOGEN_FOLDER, pokemon.id.split('.')[0], `${pokemon.id}.png`),
-        artist: ['Jeapal Fusion Calculator'],
-    };
-
     if (type === 'fusion' && !primaryImage) {
-        primaryImage = autogenSprite;
+        primaryImage = {
+            url: path.join(AUTOGEN_FOLDER, pokemon.id.split('.')[0], `${pokemon.id}.png`),
+            artist: ['Jeapal Fusion Calculator'],
+        };
+        alternativeSprites.push(primaryImage);
     }
-
-    alternativeSprites.push(autogenSprite);
 
     return {
         ...pokemon,
+        basePokemons,
         primary_image: primaryImage,
         alternative_sprites: alternativeSprites,
         total_variants: totalVariants
@@ -142,7 +165,7 @@ function processSprites(pokemon, type) {
 async function insertPokemonData(db, pokemon) {
     const stmt = await db.prepare(`
         INSERT OR REPLACE INTO sprites (
-            id, name, category, pokedex_entry, primary_type, secondary_type,
+            id, name, category, pokedex_entry, base_pokemons, primary_type, secondary_type,
             base_hp, base_atk, base_def, base_sp_atk, base_sp_def, base_spd,
             ev_hp, ev_atk, ev_def, ev_sp_atk, ev_sp_def, ev_spd,
             base_exp, growth_rate, gender_ratio, catch_rate, happiness,
@@ -151,7 +174,7 @@ async function insertPokemonData(db, pokemon) {
             front_sprite_a, shadow_x, shadow_size,
             moves, tutor_moves, egg_moves, abilities, hidden_abilities,
             primary_image, alternative_sprites, total_variants, evolves_from, evolves_to, evolution_chain
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     await stmt.run(
@@ -159,8 +182,9 @@ async function insertPokemonData(db, pokemon) {
         pokemon.name,
         pokemon.category,
         pokemon.pokedex_entry,
+        JSON.stringify(pokemon.basePokemons),  // Changed order
         pokemon.primary_type,
-        pokemon.secondary_type,
+        pokemon.secondary_type,  // Changed order
         pokemon.base_hp,
         pokemon.base_atk,
         pokemon.base_def,
@@ -212,15 +236,16 @@ async function processPokemonChunk(db, pokemonChunk) {
     await db.run('BEGIN TRANSACTION');
     try {
         for (const pokemon of pokemonChunk) {
-            const type = pokemon.id.includes('.') ? 'fusion' : (pokemon.id.includes('-') ? 'triple' : 'base');
+            const type = pokemon.id.split('.').length === 3 ? 'triple' 
+            : pokemon.id.split('.').length === 2 ? 'fusion' 
+            : 'base';
             const processedPokemon = processSprites(pokemon, type);
             await insertPokemonData(db, processedPokemon);
-            // console.log(`Processed Pokémon: ${pokemon.id} - ${pokemon.name}`);
         }
         await db.run('COMMIT');
     } catch (error) {
         await db.run('ROLLBACK');
-        console.error('Error 0processing chunk:', error);
+        console.error('Error processing chunk:', error);
     }
 }
 
