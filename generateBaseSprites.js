@@ -1,9 +1,13 @@
 import { open } from 'sqlite';
 import sqlite3 from 'sqlite3';
 import path from 'path';
+import { base } from './lib/loadPokemon.js'
 
 // Define paths and constants
 const DB_PATH = './data.sqlite';
+
+// Total Pokemons From base Pokemons
+const totalPokemons = base.length
 
 // Function to initialize the base_sprites table
 async function initializeBaseSpritesTable(db) {
@@ -78,21 +82,10 @@ async function processBaseSprite(db, baseSprite) {
     let totalHeadFusions = 0;
     let totalBodyFusions = 0;
 
-    // Parse JSON fields safely
-    // const primaryImage = baseSprite.primary_image ? JSON.parse(baseSprite.primary_image) : {};
-    // const alternativeSprites = baseSprite.alternative_sprites ? JSON.parse(baseSprite.alternative_sprites) : [];
-    // const eggGroups = baseSprite.egg_groups ? JSON.parse(baseSprite.egg_groups) : [];
-    // const moves = baseSprite.moves ? JSON.parse(baseSprite.moves) : [];
-    // const tutorMoves = baseSprite.tutor_moves ? JSON.parse(baseSprite.tutor_moves) : [];
-    // const eggMoves = baseSprite.egg_moves ? JSON.parse(baseSprite.egg_moves) : [];
-    // const abilities = baseSprite.abilities ? JSON.parse(baseSprite.abilities) : [];
-    // const hiddenAbilities = baseSprite.hidden_abilities ? JSON.parse(baseSprite.hidden_abilities) : [];
-    // const evolvesFrom = baseSprite.evolves_from ? JSON.parse(baseSprite.evolves_from) : [];
-    // const evolvesTo = baseSprite.evolves_to ? JSON.parse(baseSprite.evolves_to) : [];
-    // const evolutionChain = baseSprite.evolution_chain ? JSON.parse(baseSprite.evolution_chain) : [];
+
 
     // Search for head fusions
-    for (let i = 1; i <= 470; i++) {
+    for (let i = 1; i <= totalPokemons; i++) {
         const fusionId = `${baseId}.${i}`;
         const fusion = await db.get('SELECT * FROM sprites WHERE id = ?', [fusionId]);
         if (fusion) {
@@ -114,7 +107,7 @@ async function processBaseSprite(db, baseSprite) {
     }
 
     // Search for body fusions
-    for (let i = 1; i <= 470; i++) {
+    for (let i = 1; i <= totalPokemons; i++) {
         const fusionId = `${i}.${baseId}`;
         const fusion = await db.get('SELECT * FROM sprites WHERE id = ?', [fusionId]);
         if (fusion) {
