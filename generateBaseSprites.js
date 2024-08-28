@@ -3,7 +3,7 @@ import sqlite3 from 'sqlite3';
 import path from 'path';
 
 // Define paths and constants
-const DB_PATH = './pokemon_data.sqlite';
+const DB_PATH = './data.sqlite';
 
 // Function to initialize the base_sprites table
 async function initializeBaseSpritesTable(db) {
@@ -240,7 +240,7 @@ async function main() {
         console.log("Processing base Pokémon data...");
         for (let i = 0; i < baseSprites.length; i++) {
             const baseSprite = baseSprites[i];
-            console.log(baseSprite);
+            // console.log(baseSprite);
             await processBaseSprite(db, baseSprite);
         }
 

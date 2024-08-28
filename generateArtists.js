@@ -3,7 +3,7 @@ import sqlite3 from 'sqlite3';
 import fs from 'fs/promises';
 
 // Define paths and constants
-const DB_PATH = './pokemon_data.sqlite';
+const DB_PATH = './data.sqlite';
 const CSV_PATH = './lib/data/Sprite Credits.csv';
 
 // Function to initialize the artists table
@@ -46,11 +46,13 @@ async function processArtistsData(db, parsedCSV) {
             const artistData = artistsMap.get(artistName);
             artistData.total_sprites += 1;
             artistData.sprite_ids.push(id);
-            console.log(artistName)
+            // console.log(artistName)
         }
     }
 
     for (const [name, { total_sprites, sprite_ids }] of artistsMap) {
+        console.log(name, total_sprites,
+        );
         await insertArtistData(db, name, total_sprites, sprite_ids);
     }
 }
