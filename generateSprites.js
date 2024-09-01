@@ -65,7 +65,7 @@ async function initializeDatabase(db) {
             abilities JSON,
             hidden_abilities JSON,
             primary_image JSON,
-            alternative_sprites JSON,
+            all_sprites JSON,
             total_variants INTEGER,
             evolves_from JSON,
             evolves_to JSON,
@@ -107,10 +107,13 @@ function getSpritesForId(id, type) {
 }
 
 function generateBasePokemons(id) {
-    const all_Base_Pokemons = {}
+    const all_Base_Pokemons = []
     const ids = id.split('.')
     ids.forEach(pokemonId => {
-        all_Base_Pokemons[pokemonId] = base_pokemon_name[pokemonId]
+        all_Base_Pokemons.push({
+            id: pokemonId,
+            name: base_pokemon_name[pokemonId]
+        })
     });
     return all_Base_Pokemons
 }
@@ -121,7 +124,7 @@ function processSprites(pokemon, type) {
 
     const basePokemons = generateBasePokemons(pokemon.id)
 
-    let primaryImage, alternativeSprites = [];
+    let primaryImage, allSprites = [];
 
     if (sprites.length > 0) {
         const credit = spriteCredits.find(c => c.id === pokemon.id) || 
@@ -132,7 +135,7 @@ function processSprites(pokemon, type) {
             artist: credit ? credit.artist.split(' & ') : []
         };
 
-        alternativeSprites = sprites.map(sprite => {
+        allSprites = sprites.map(sprite => {
             const spriteId = path.parse(sprite).name;
             const spriteCredit = spriteCredits.find(c => c.id === spriteId) || 
                                  spriteCredits.find(c => c.id === spriteId.replace(/[a-z]$/, ''));
@@ -143,21 +146,23 @@ function processSprites(pokemon, type) {
         });
     }
 
-    const totalVariants = alternativeSprites.length;
+    const totalVariants = allSprites.length;
 
     if (type === 'fusion' && !primaryImage) {
         primaryImage = {
             url: path.join(AUTOGEN_FOLDER, pokemon.id.split('.')[0], `${pokemon.id}.png`),
             artist: ['Jeapal Fusion Calculator'],
         };
-        alternativeSprites.push(primaryImage);
+        // if all sprites is not avilable i should not push
+        // this autogen sprites image
+        // allSprites.push(primaryImage);
     }
 
     return {
         ...pokemon,
         basePokemons,
         primary_image: primaryImage,
-        alternative_sprites: alternativeSprites,
+        all_sprites: allSprites,
         total_variants: totalVariants
     };
 }
@@ -173,7 +178,7 @@ async function insertPokemonData(db, pokemon) {
             back_sprite_x, back_sprite_y, front_sprite_x, front_sprite_y,
             front_sprite_a, shadow_x, shadow_size,
             moves, tutor_moves, egg_moves, abilities, hidden_abilities,
-            primary_image, alternative_sprites, total_variants, evolves_from, evolves_to, evolution_chain
+            primary_image, all_sprites, total_variants, evolves_from, evolves_to, evolution_chain
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
@@ -222,7 +227,7 @@ async function insertPokemonData(db, pokemon) {
         JSON.stringify(pokemon.abilities),
         JSON.stringify(pokemon.hidden_abilities),
         JSON.stringify(pokemon.primary_image),
-        JSON.stringify(pokemon.alternative_sprites),
+        JSON.stringify(pokemon.all_sprites),
         pokemon.total_variants,
         JSON.stringify(pokemon.evolves_from),
         JSON.stringify(pokemon.evolves_to),
