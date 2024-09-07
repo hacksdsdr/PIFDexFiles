@@ -18,6 +18,7 @@ async function main() {
             total_triple_fusions INTEGER,
             total_custom_sprites INTEGER,
             total_artists INTEGER
+            
         )
     `);
 

@@ -1,23 +1,20 @@
-import { base, fusions, triples } from "./lib/loadPokemon.js";
-import { buildEvolutionChains, extractEvolutions } from "./lib/loadEvolutions.js";
 import fs from 'fs/promises';
-import path from 'path';
 import sqlite3 from 'sqlite3';
 import { open } from 'sqlite';
+import { base, fusions, triples } from "./lib/loadPokemon.js";
+import { buildEvolutionChains, extractEvolutions } from "./lib/loadEvolutions.js";
 
-const SPRITE_CREDITS_PATH = './lib/data/Sprite Credits.csv';
-const SPRITE_FOLDERS = {
-    base: './graphics/custom-sprites/Other/BaseSprites',
-    fusion: './graphics/custom-sprites/CustomBattlers',
-    triple: './graphics/custom-sprites/Other/Triples'
-};
-const AUTOGEN_FOLDER = './graphics/autogen-sprites';
 const DB_PATH = './data.sqlite';
-const CHUNK_SIZE = 1000;
+const DEX_PATH = './lib/data/dex.json';
+const CHUNK_SIZE = 10000;
 
-let spriteFiles = {};
-let spriteCredits = [];
+// Function to load dex.json entries
+async function loadDexEntries() {
+    const dexData = await fs.readFile(DEX_PATH, 'utf-8');
+    return JSON.parse(dexData);
+}
 
+// Initialize the database and create tables
 async function initializeDatabase(db) {
     await db.exec(`
         CREATE TABLE IF NOT EXISTS sprites (
@@ -64,109 +61,54 @@ async function initializeDatabase(db) {
             egg_moves JSON,
             abilities JSON,
             hidden_abilities JSON,
-            primary_image JSON,
-            all_sprites JSON,
-            total_variants INTEGER,
             evolves_from JSON,
             evolves_to JSON,
             evolution_chain JSON
         )
     `);
+
+    await db.exec(`
+        CREATE TABLE IF NOT EXISTS artists (
+            sprite_id TEXT PRIMARY KEY,
+            sprite_type TEXT,
+            base_id TEXT,
+            artists JSON,
+            notes TEXT,
+            FOREIGN KEY (base_id) REFERENCES sprites(id)
+        )
+    `);
 }
 
-const create_base_pokemon_name = () => {
-    let pokemons = {}
-    for (const pokemon of  base) {
-        pokemons[pokemon.id] = pokemon.name
+// Function to create base Pokémon names by ID
+function createBasePokemonName() {
+    const pokemons = {};
+    for (const pokemon of base) {
+        pokemons[pokemon.id] = pokemon.name;
     }
-
-    return pokemons
+    return pokemons;
 }
 
-const base_pokemon_name = create_base_pokemon_name()
+const basePokemonName = createBasePokemonName();
 
-console.log(base_pokemon_name)
+// Process Pokémon data, check dex.json for additional entries
+async function processPokemonData(db, pokemon, dexEntries) {
+    const basePokemons = pokemon.id.split('.').map(pokemonId => ({
+        id: pokemonId,
+        name: basePokemonName[pokemonId] || 'Unknown'
+    }));
 
-async function readCSV(filePath) {
-    const fileContent = await fs.readFile(filePath, 'utf-8');
-    return fileContent.split('\n').map(line => {
-        const [id, artist, type, notes] = line.split(',');
-        return { id, artist, type, notes };
-    });
-}
-
-async function cacheFileList() {
-    for (const [key, folder] of Object.entries(SPRITE_FOLDERS)) {
-        spriteFiles[key] = new Set(await fs.readdir(folder));
-    }
-}
-
-function getSpritesForId(id, type) {
-    const regex = new RegExp(`^${id}[a-z]?\\.png$`);
-    return Array.from(spriteFiles[type]).filter(file => regex.test(file));
-}
-
-function generateBasePokemons(id) {
-    const all_Base_Pokemons = []
-    const ids = id.split('.')
-    ids.forEach(pokemonId => {
-        all_Base_Pokemons.push({
-            id: pokemonId,
-            name: base_pokemon_name[pokemonId]
-        })
-    });
-    return all_Base_Pokemons
-}
-
-function processSprites(pokemon, type) {
-    const folderPath = SPRITE_FOLDERS[type];
-    const sprites = getSpritesForId(pokemon.id, type);
-
-    const basePokemons = generateBasePokemons(pokemon.id)
-
-    let primaryImage, allSprites = [];
-
-    if (sprites.length > 0) {
-        const credit = spriteCredits.find(c => c.id === pokemon.id) || 
-                       spriteCredits.find(c => c.id === pokemon.id.split('.').pop());
-
-        primaryImage = {
-            url: path.join(folderPath, `${pokemon.id}.png`),
-            artist: credit ? credit.artist.split(' & ') : []
-        };
-
-        allSprites = sprites.map(sprite => {
-            const spriteId = path.parse(sprite).name;
-            const spriteCredit = spriteCredits.find(c => c.id === spriteId) || 
-                                 spriteCredits.find(c => c.id === spriteId.replace(/[a-z]$/, ''));
-            return {
-                url: path.join(folderPath, sprite),
-                artist: spriteCredit ? spriteCredit.artist.split(' & ') : []
-            };
-        });
-    }
-
-    const totalVariants = allSprites.length;
-
-    if (type === 'fusion' && !primaryImage) {
-        primaryImage = {
-            url: path.join(AUTOGEN_FOLDER, pokemon.id.split('.')[0], `${pokemon.id}.png`),
-            artist: ['Jeapal Fusion Calculator'],
-        };
-        // if all sprites is not avilable i should not push
-        // this autogen sprites image
-        // allSprites.push(primaryImage);
-    }
+    // Check if the sprite has a matching entry in dex.json
+    const dexEntry = dexEntries.find(entry => entry.sprite === `${pokemon.id}.png`);
+    const pokedexEntry = dexEntry ? dexEntry.entry : pokemon.pokedex_entry;
 
     return {
         ...pokemon,
         basePokemons,
-        primary_image: primaryImage,
-        all_sprites: allSprites,
-        total_variants: totalVariants
+        pokedex_entry: pokedexEntry // Update pokedex_entry if found in dex.json
     };
 }
 
+// Insert Pokémon data into SQLite
 async function insertPokemonData(db, pokemon) {
     const stmt = await db.prepare(`
         INSERT OR REPLACE INTO sprites (
@@ -178,8 +120,8 @@ async function insertPokemonData(db, pokemon) {
             back_sprite_x, back_sprite_y, front_sprite_x, front_sprite_y,
             front_sprite_a, shadow_x, shadow_size,
             moves, tutor_moves, egg_moves, abilities, hidden_abilities,
-            primary_image, all_sprites, total_variants, evolves_from, evolves_to, evolution_chain
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            evolves_from, evolves_to, evolution_chain
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     await stmt.run(
@@ -187,9 +129,9 @@ async function insertPokemonData(db, pokemon) {
         pokemon.name,
         pokemon.category,
         pokemon.pokedex_entry,
-        JSON.stringify(pokemon.basePokemons),  // Changed order
+        JSON.stringify(pokemon.basePokemons),
         pokemon.primary_type,
-        pokemon.secondary_type,  // Changed order
+        pokemon.secondary_type,
         pokemon.base_hp,
         pokemon.base_atk,
         pokemon.base_def,
@@ -226,9 +168,6 @@ async function insertPokemonData(db, pokemon) {
         JSON.stringify(pokemon.egg_moves),
         JSON.stringify(pokemon.abilities),
         JSON.stringify(pokemon.hidden_abilities),
-        JSON.stringify(pokemon.primary_image),
-        JSON.stringify(pokemon.all_sprites),
-        pokemon.total_variants,
         JSON.stringify(pokemon.evolves_from),
         JSON.stringify(pokemon.evolves_to),
         JSON.stringify(pokemon.evolution_chain)
@@ -237,14 +176,12 @@ async function insertPokemonData(db, pokemon) {
     await stmt.finalize();
 }
 
-async function processPokemonChunk(db, pokemonChunk) {
+// Process Pokémon in chunks for performance
+async function processPokemonChunk(db, pokemonChunk, dexEntries) {
     await db.run('BEGIN TRANSACTION');
     try {
         for (const pokemon of pokemonChunk) {
-            const type = pokemon.id.split('.').length === 3 ? 'triple' 
-            : pokemon.id.split('.').length === 2 ? 'fusion' 
-            : 'base';
-            const processedPokemon = processSprites(pokemon, type);
+            const processedPokemon = await processPokemonData(db, pokemon, dexEntries);
             await insertPokemonData(db, processedPokemon);
         }
         await db.run('COMMIT');
@@ -254,15 +191,13 @@ async function processPokemonChunk(db, pokemonChunk) {
     }
 }
 
+// Main function to run the whole process
 async function main() {
     try {
-        console.log("Initializing...");
-        spriteCredits = await readCSV(SPRITE_CREDITS_PATH);
-        console.log(`Read ${spriteCredits.length} sprite credit entries.`);
+        console.log("Loading dex entries...");
+        const dexEntries = await loadDexEntries();
 
-        console.log("Caching file lists...");
-        await cacheFileList();
-
+        console.log("Initializing database...");
         const db = await open({
             filename: DB_PATH,
             driver: sqlite3.Database
@@ -286,15 +221,14 @@ async function main() {
             pokemon.evolution_chain = evolutionData.evolutionChain || [];
         });
 
-        console.log("Inserting data into SQLite database...");
+        console.log("Inserting Pokémon data into SQLite...");
         for (let i = 0; i < allPokemon.length; i += CHUNK_SIZE) {
             const chunk = allPokemon.slice(i, i + CHUNK_SIZE);
-            await processPokemonChunk(db, chunk);
+            await processPokemonChunk(db, chunk, dexEntries);
             console.log(`Processed ${i + chunk.length}/${allPokemon.length} Pokémon`);
         }
 
         await db.close();
-
         console.log('Pokémon data saved to SQLite database');
     } catch (error) {
         console.error('Error processing data:', error);
