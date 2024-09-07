@@ -1,7 +1,8 @@
 #!/bin/bash
 
 # Array of tables to dump and upload
-tables=("artists" "base_sprites" "sprites" "game_info")
+tables=("sprites")
+# tables=("artists" "base_sprites" "sprites" "game_info")
 
 # SQLite database file
 db_file="data.sqlite"

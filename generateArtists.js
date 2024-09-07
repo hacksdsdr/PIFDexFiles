@@ -217,7 +217,7 @@ async function main() {
         const artistsArr = processedData.map(artist => ({
             sprite_id: artist.sprite_id,
             base_id: artist.base_id,
-            type: artist.sprite_type,
+            // type: artist.sprite_type,
         }));
         
         await saveArtistsToJSON(artistsArr)
