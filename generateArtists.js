@@ -140,8 +140,7 @@ async function createArtistsTable(db) {
             sprite_type TEXT,
             base_id TEXT,
             artists JSON,
-            notes TEXT,
-            FOREIGN KEY (base_id) REFERENCES sprites(id)
+            notes TEXT
         )
     `);
 }

@@ -66,17 +66,6 @@ async function initializeDatabase(db) {
             evolution_chain JSON
         )
     `);
-
-    await db.exec(`
-        CREATE TABLE IF NOT EXISTS artists (
-            sprite_id TEXT PRIMARY KEY,
-            sprite_type TEXT,
-            base_id TEXT,
-            artists JSON,
-            notes TEXT,
-            FOREIGN KEY (base_id) REFERENCES sprites(id)
-        )
-    `);
 }
 
 // Function to create base Pokémon names by ID
