@@ -81,11 +81,13 @@ const basePokemonName = createBasePokemonName();
 
 // Process Pokémon data, check dex.json for additional entries
 async function processPokemonData(db, pokemon, dexEntries) {
+
     const basePokemons = pokemon.id.split('.').map(pokemonId => {
-        let baseObj = {}
+        let baseObj = {};
         baseObj[pokemonId] = basePokemonName[pokemonId];
-        return basePokemons
-    })
+        return basePokemons;
+    });
+    
 
     // Check if the sprite has a matching entry in dex.json
     const dexEntry = dexEntries.find(entry => entry.sprite === `${pokemon.id}.png`);
