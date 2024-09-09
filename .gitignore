@@ -1,4 +1,2 @@
 node_modules
 data.sqlite
-./lib/data/artists.json
-./lib/data/info.json

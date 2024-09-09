@@ -85,8 +85,9 @@ async function processPokemonData(db, pokemon, dexEntries) {
     const basePokemons = pokemon.id.split('.').map(pokemonId => {
         let baseObj = {};
         baseObj[pokemonId] = basePokemonName[pokemonId];
-        return basePokemons;
+        return baseObj;  // Correct return value
     });
+    
     
 
     // Check if the sprite has a matching entry in dex.json
@@ -95,7 +96,7 @@ async function processPokemonData(db, pokemon, dexEntries) {
 
     return {
         ...pokemon,
-        basePokemons,
+        basePokemons: {...basePokemons},
         pokedex_entry: pokedexEntry // Update pokedex_entry if found in dex.json
     };
 }
@@ -198,6 +199,7 @@ async function main() {
         await initializeDatabase(db);
 
         console.log("Processing Pokémon data...");
+        // const allPokemon = [...base];
         const allPokemon = [...base, ...fusions, ...triples];
 
         console.log("Extracting evolutions...");

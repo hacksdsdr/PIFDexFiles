@@ -15,19 +15,8 @@ async function getPokemonStats() {
         const totalSprites = await db.get('SELECT COUNT(*) as count FROM sprites');
 
         // 2. Total custom sprites
-        // const totalCustomSprites = await db.get(`
-        //     SELECT COUNT(*) as count 
-        //     FROM artists 
-        //     WHERE (sprite_type = 'main' OR sprite_type = 'alt')
-        //     AND (
-        //         SELECT COUNT(*) 
-        //         FROM artists AS a2 
-        //         WHERE a2.base_id = artists.base_id
-        //     ) > 1
-        // `);
-
         const totalCustomSprites = await db.all(`
-          SELECT COUNT(DISTINCT base_id) AS unique_pokemon_count
+          SELECT COUNT(DISTINCT base_id) as totalCustomSprites
           FROM artists
           WHERE base_id LIKE '%[0-9]%'
           AND base_id NOT LIKE '%[^0-9.]%'
@@ -44,15 +33,15 @@ async function getPokemonStats() {
             const headCount = await db.get(`
                 SELECT COUNT(*) as count
                 FROM artists
-                WHERE sprite_id LIKE '${id}.%' AND (sprite_type = 'main' OR sprite_type = 'alt')
+                WHERE sprite_id GLOB '${id}.[0-9]*' AND (sprite_type = 'main')
             `);
-
+            
             const bodyCount = await db.get(`
                 SELECT COUNT(*) as count
                 FROM artists
-                WHERE sprite_id LIKE '%.${id}' AND (sprite_type = 'main' OR sprite_type = 'alt')
+                WHERE sprite_id GLOB '[0-9]*.${id}' AND (sprite_type = 'main')
             `);
-
+            
             customSpritesJson[id] = { 
                 head: headCount.count, 
                 body: bodyCount.count 
@@ -71,8 +60,8 @@ async function getPokemonStats() {
             basePokemonNamesJson[row.id] = row.name;
         });
 
-        // 5. Sprite type counts
-        const spriteTypeCounts = await db.all(`
+        // 5. Sprite type counts (fixing the alias issue)
+        const spriteTypeCounts = await db.get(`
             SELECT 
                 SUM(CASE WHEN id NOT LIKE '%.%' THEN 1 ELSE 0 END) as base_count,
                 SUM(CASE WHEN id LIKE '%.%' AND id NOT LIKE '%.%.%' THEN 1 ELSE 0 END) as fusion_count,
@@ -80,159 +69,137 @@ async function getPokemonStats() {
             FROM sprites
         `);
 
+        // Processing fusions data
+        const typesSet = new Set();
+        const abilitiesSet = new Set();
+        const hiddenAbilitiesSet = new Set();
+        const growthRateSet = new Set();
+        const colorSet = new Set();
+        const shapeSet = new Set();
+        const movesSet = new Set();
+        const tutorMovesSet = new Set();
+        const eggMovesSet = new Set();
 
- // Processing fusions data
+        for (const basePokemon of fusions) {
+            typesSet.add(basePokemon.primary_type);
+            if (basePokemon.secondary_type) {
+                typesSet.add(basePokemon.secondary_type);
+            }
 
- const typesSet = new Set();
- const abilitiesSet = new Set();
- const hiddenAbilitiesSet = new Set();
- const growthRateSet = new Set();
- const genderRatioSet = new Set();
- const eggGroupsSet = new Set();
- const habitatSet = new Set();
- const colorSet = new Set();
- const shapeSet = new Set();
- const movesSet = new Set();
- const tutorMovesSet = new Set();
- const eggMovesSet = new Set();
+            if (basePokemon.abilities) {
+                basePokemon.abilities.forEach(ability => abilitiesSet.add(ability));
+            }
+            if (basePokemon.hidden_abilities) {
+                basePokemon.hidden_abilities.forEach(hiddenAbility => hiddenAbilitiesSet.add(hiddenAbility));
+            }
 
- for (const basePokemon of fusions) {
-     typesSet.add(basePokemon.primary_type);
-     if (basePokemon.secondary_type) {
-         typesSet.add(basePokemon.secondary_type);
-     }
+            growthRateSet.add(basePokemon.growth_rate);
+            colorSet.add(basePokemon.color);
+            shapeSet.add(basePokemon.shape);
 
-     // Safely handle abilities and hidden abilities
-     if (basePokemon.abilities) {
-         basePokemon.abilities.forEach(ability => abilitiesSet.add(ability));
-     }
-     if (basePokemon.hidden_abilities) {
-         basePokemon.hidden_abilities.forEach(hiddenAbility => hiddenAbilitiesSet.add(hiddenAbility));
-     }
+            if (basePokemon.moves) {
+                basePokemon.moves.forEach(move => movesSet.add(move.move));
+            }
+            if (basePokemon.tutor_moves) {
+                basePokemon.tutor_moves.forEach(move => tutorMovesSet.add(move));
+            }
+            if (basePokemon.egg_moves) {
+                basePokemon.egg_moves.forEach(move => eggMovesSet.add(move));
+            }
+        }
 
-     growthRateSet.add(basePokemon.growth_rate);
-     genderRatioSet.add(basePokemon.gender_ratio);
-     if (basePokemon.egg_groups) {
-         basePokemon.egg_groups.forEach(group => eggGroupsSet.add(group));
-     }
-     habitatSet.add(basePokemon.habitat);
-     colorSet.add(basePokemon.color);
-     shapeSet.add(basePokemon.shape);
-     
-     if (basePokemon.moves) {
-         basePokemon.moves.forEach(move => movesSet.add(move.move));
-     }
-     if (basePokemon.tutor_moves) {
-         basePokemon.tutor_moves.forEach(move => tutorMovesSet.add(move));
-     }
-     if (basePokemon.egg_moves) {
-         basePokemon.egg_moves.forEach(move => eggMovesSet.add(move));
-     }
- }
+        // Convert sets to arrays
+        const types = Array.from(typesSet).sort();
+        const abilities = Array.from(abilitiesSet).sort();
+        const hiddenAbilities = Array.from(hiddenAbilitiesSet).sort();
+        const growthRate = Array.from(growthRateSet).sort();
+        const color = Array.from(colorSet).sort();
+        const shape = Array.from(shapeSet).sort();
+        const moves = Array.from(movesSet).sort();
+        const tutorMoves = Array.from(tutorMovesSet).sort();
+        const eggMoves = Array.from(eggMovesSet).sort();
 
- // Convert sets to arrays
- const types = Array.from(typesSet).sort();
- const abilities = Array.from(abilitiesSet).sort();
- const hiddenAbilities = Array.from(hiddenAbilitiesSet).sort();
- const growthRate = Array.from(growthRateSet).sort();
- const genderRatio = Array.from(genderRatioSet).sort();
- const eggGroups = Array.from(eggGroupsSet).sort();
- const habitat = Array.from(habitatSet).sort();
- const color = Array.from(colorSet).sort();
- const shape = Array.from(shapeSet).sort();
- const moves = Array.from(movesSet).sort();
- const tutorMoves = Array.from(tutorMovesSet).sort();
- const eggMoves = Array.from(eggMovesSet).sort();
+        // Combine all results
+        const result = {
+            total_sprites: totalSprites.count,
+            custom_sprites_head_body: customSpritesJson,
+            base_pokemon_names: basePokemonNamesJson,
+            sprite_type_counts: {
+                base: spriteTypeCounts.base_count,
+                fusion: spriteTypeCounts.fusion_count,
+                triple: spriteTypeCounts.triple_count,
+                totalCustomSprites: totalCustomSprites[0].totalCustomSprites
+            },
+            types: types,
+            abilities: abilities,
+            hiddenAbilities: hiddenAbilities,
+            growthRate: growthRate,
+            color: color,
+            shape: shape,
+            moves: moves,
+            tutorMoves: tutorMoves,
+            eggMoves: eggMoves
+        };
 
- // Combine all results
- const result = {
-     total_sprites: totalSprites.count,
-     custom_sprites_head_body: customSpritesJson,
-     base_pokemon_names: basePokemonNamesJson,
-     sprite_type_counts: {
-         base: spriteTypeCounts.base_count,
-         fusion: spriteTypeCounts.fusion_count,
-         triple: spriteTypeCounts.triple_count,
-         custom: totalCustomSprites.unique_pokemon_count
-     },
-     types: types,
-     abilities: abilities,
-     hiddenAbilities: hiddenAbilities,
-     growthRate: growthRate,
-     genderRatio: genderRatio,
-     eggGroups: eggGroups,
-     habitat: habitat,
-     color: color,
-     shape: shape,
-     moves: moves,
-     tutorMoves: tutorMoves,
-     eggMoves: eggMoves
- };
+        await fs.writeFile('./lib/data/info.json', JSON.stringify(result, null, 2));
 
- // Create or replace the 'game_info' table
- await db.exec(`
-     CREATE TABLE IF NOT EXISTS game_info (
-         id INTEGER PRIMARY KEY,
-         total_sprites INTEGER,
-         custom_sprites_head_body JSON,
-         base_pokemon_names JSON,
-         sprite_type_counts JSON,
-         types JSON,
-         abilities JSON,
-         hiddenAbilities JSON,
-         growth_rate JSON,
-         gender_ratio JSON,
-         egg_groups JSON,
-         habitat JSON,
-         color JSON,
-         shape JSON,
-         moves JSON,
-         tutor_moves JSON,
-         egg_moves JSON
-     )
- `);
+        // Create or replace the 'game_info' table
+        await db.exec(`
+            CREATE TABLE IF NOT EXISTS game_info (
+                id INTEGER PRIMARY KEY,
+                total_sprites INTEGER,
+                custom_sprites_head_body JSON,
+                base_pokemon_names JSON,
+                sprite_type_counts JSON,
+                types JSON,
+                abilities JSON,
+                hiddenAbilities JSON,
+                growth_rate JSON,
+                color JSON,
+                shape JSON,
+                moves JSON,
+                tutor_moves JSON,
+                egg_moves JSON
+            )
+        `);
 
- // Delete any existing rows in game_info table to avoid duplicates
- await db.exec('DELETE FROM game_info');
+        // Delete any existing rows in game_info table to avoid duplicates
+        await db.exec('DELETE FROM game_info');
 
- // Insert the result into the 'game_info' table
- const stmt = await db.prepare(`
-     INSERT INTO game_info (
-         total_sprites, custom_sprites_head_body, base_pokemon_names, 
-         sprite_type_counts, types, abilities, hiddenAbilities, growth_rate, 
-         gender_ratio, egg_groups, habitat, color, shape, moves, 
-         tutor_moves, egg_moves
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
- `);
+        // Insert the result into the 'game_info' table
+        const stmt = await db.prepare(`
+            INSERT INTO game_info (
+                total_sprites, custom_sprites_head_body, base_pokemon_names, 
+                sprite_type_counts, types, abilities, hiddenAbilities, growth_rate, 
+                color, shape, moves, tutor_moves, egg_moves
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `);
 
- await stmt.run(
-     result.total_sprites,
-     JSON.stringify(result.custom_sprites_head_body),
-     JSON.stringify(result.base_pokemon_names),
-     JSON.stringify(result.sprite_type_counts),
-     JSON.stringify(result.types),
-     JSON.stringify(result.abilities),
-     JSON.stringify(result.hiddenAbilities),
-     JSON.stringify(result.growthRate),
-     JSON.stringify(result.genderRatio),
-     JSON.stringify(result.eggGroups),
-     JSON.stringify(result.habitat),
-     JSON.stringify(result.color),
-     JSON.stringify(result.shape),
-     JSON.stringify(result.moves),
-     JSON.stringify(result.tutorMoves),
-     JSON.stringify(result.eggMoves)
- );
+        await stmt.run(
+            result.total_sprites,
+            JSON.stringify(result.custom_sprites_head_body),
+            JSON.stringify(result.base_pokemon_names),
+            JSON.stringify(result.sprite_type_counts),
+            JSON.stringify(result.types),
+            JSON.stringify(result.abilities),
+            JSON.stringify(result.hiddenAbilities),
+            JSON.stringify(result.growthRate),
+            JSON.stringify(result.color),
+            JSON.stringify(result.shape),
+            JSON.stringify(result.moves),
+            JSON.stringify(result.tutorMoves),
+            JSON.stringify(result.eggMoves)
+        );
 
- await stmt.finalize();
+        await stmt.finalize();
 
- console.log('Game data saved to game_info table in SQLite database.');
+        console.log('Game data saved to game_info table in SQLite database.');
 
-} catch (error) {
- console.error('Error:', error);
-} finally {
- await db.close();
-}
+    } catch (error) {
+        console.error('Error:', error);
+    } finally {
+        await db.close();
+    }
 }
 
 getPokemonStats();
