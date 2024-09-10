@@ -35,11 +35,12 @@ upload_to_d1() {
     local file=$1
     echo "Uploading $file to Cloudflare D1..."
     npx wrangler d1 execute $d1_db_name --remote --file="$file"
+    
 }
 
 # Main process
 for table in "${tables[@]}"; do
-    output_file="${table}_dump.sql"
+    output_file="${table}.sql"
     
     # Remove existing dump file if it exists
     if [ -f "$output_file" ]; then

@@ -1131,3 +1131,4 @@ module GameData
     470 => 800,
   }
 end
+
