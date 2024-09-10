@@ -82,11 +82,10 @@ const basePokemonName = createBasePokemonName();
 // Process Pokémon data, check dex.json for additional entries
 async function processPokemonData(db, pokemon, dexEntries) {
 
-    const basePokemons = pokemon.id.split('.').map(pokemonId => {
-        let baseObj = {};
-        baseObj[pokemonId] = basePokemonName[pokemonId];
-        return baseObj;  // Correct return value
-    });
+    const basePokemons = pokemon.id.split('.').reduce((acc, pokemonId) => {
+        acc[pokemonId] = basePokemonName[pokemonId];
+        return acc;
+    }, {});
     
     
 
