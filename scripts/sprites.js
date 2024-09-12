@@ -232,7 +232,7 @@ async function main() {
          })
 
         //  const allPokemon = [...base];
-         const allPokemon = [...base, ...fusions, ...triples];
+        const allPokemon = [...base, ...fusions, ...triples];
 
        
 
