@@ -3,14 +3,14 @@ import sqlite3 from 'sqlite3';
 import { open } from 'sqlite';
 
 // Paths and settings
-const SPRITE_CREDITS_PATH = './graphics/Sprite Credits.csv';
+const SPRITE_CREDITS_PATH = '/workspaces/PIFDexFiles/graphics/Sprite Credits.csv';
 const SPRITE_FOLDERS = {
-    base: './graphics/base',          // Path to base sprites
-    fusion: './graphics/fusions',     // Path to fusion sprites
-    triple: './graphics/triples'      // Path to triple sprites
+    base: '/workspaces/PIFDexFiles/graphics/base',          // Path to base sprites
+    fusion: '/workspaces/PIFDexFiles/graphics/fusions',     // Path to fusion sprites
+    triple: '/workspaces/PIFDexFiles/graphics/triples'      // Path to triple sprites
 };
 
-const DB_PATH = './data.sqlite';
+const DB_PATH = '/workspaces/PIFDexFiles/data.sqlite';
 const BATCH_SIZE = 5000; // Adjust this based on your system's memory capacity
 
 // Function to read CSV
@@ -178,8 +178,8 @@ async function insertArtistsData(db, data) {
 // Save JSON file with artists data
 async function saveArtistsToJSON(data) {
     try {
-        await fs.writeFile('./lib/data/artists.json', JSON.stringify(data, null, 2), 'utf-8');
-        console.log(`Artists data saved to './lib/data/artists.json'`);
+        await fs.writeFile('/workspaces/PIFDexFiles/lib/data/artists.json', JSON.stringify(data, null, 2), 'utf-8');
+        console.log(`Artists data saved to '/workspaces/PIFDexFiles/lib/data/artists.json'`);
     } catch (error) {
         console.error('Error saving artists data to JSON file:', error);
     }

@@ -2,11 +2,11 @@ import sqlite3 from 'sqlite3';
 import { open } from 'sqlite';
 import fs from 'fs/promises';
 import path from 'path';
-import { fusions } from './lib/loadPokemon.js';
+import { fusions } from '/workspaces/PIFDexFiles/lib/loadPokemon.js';
 
 async function getPokemonStats() {
     const db = await open({
-        filename: 'data.sqlite',
+        filename: '/workspaces/PIFDexFiles/data.sqlite',
         driver: sqlite3.Database
     });
 
@@ -141,7 +141,7 @@ async function getPokemonStats() {
             eggMoves: eggMoves
         };
 
-        await fs.writeFile('./lib/data/info.json', JSON.stringify(result, null, 2));
+        await fs.writeFile('/workspaces/PIFDexFiles/lib/data/info.json', JSON.stringify(result, null, 2));
 
         // Create or replace the 'game_info' table
         await db.exec(`

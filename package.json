@@ -1,7 +1,7 @@
 {
     "type": "module",
     "dependencies": {
-        "discord.js": "^14.15.3",
+        "@hyrious/marshal": "^0.3.3",
         "sqlite": "^5.1.1",
         "sqlite3": "^5.1.7",
         "wrangler": "^3.72.3"

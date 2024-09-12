@@ -1,16 +1,16 @@
 import fs from 'fs/promises';
 import sqlite3 from 'sqlite3';
 import { open } from 'sqlite';
-import { base, fusions, triples } from "./lib/loadPokemon.js";
-import { buildEvolutionChains, extractEvolutions } from "./lib/loadEvolutions.js";
+import { base, fusions, triples } from '/workspaces/PIFDexFiles/lib/loadPokemon.js';
+import { buildEvolutionChains, extractEvolutions } from '/workspaces/PIFDexFiles/lib/loadEvolutions.js';
 
-const DB_PATH = './data.sqlite';
-const DEX_PATH = './lib/data/dex.json';
+const DB_PATH = '/workspaces/PIFDexFiles/data.sqlite';
+const DEX_PATH = '/workspaces/PIFDexFiles/lib/data/dex.json';
 const CHUNK_SIZE = 10000;
 
 // Function to load dex.json entries
 async function loadDexEntries() {
-    const dexData = await fs.readFile(DEX_PATH, 'utf-8');
+    const dexData = await fs.readFile('/workspaces/PIFDexFiles/lib/data/dex.json', 'utf-8');
     return JSON.parse(dexData);
 }
 
@@ -198,8 +198,43 @@ async function main() {
         await initializeDatabase(db);
 
         console.log("Processing Pokémon data...");
-        // const allPokemon = [...base];
-        const allPokemon = [...base, ...fusions, ...triples];
+
+        /**
+         * so by default triple pokemons have types like this
+         * "primary_type":"FIREWATERGRASS","secondary_type":"FIREWATERGRASS"
+         * but we need type like this structure FIRE/WATER/GRASS
+         * so for this we need to loop all triples and update there 
+         * "primary_type" and "secondary_type"
+         * so ofr this we need ot match type from type chart by finding 
+         * 
+         */
+
+        const TYPE_CHART = [
+            "NORMAL", "FIRE", "WATER", "ELECTRIC", "GRASS", "ICE", "FIGHTING",
+            "POISON", "GROUND", "FLYING", "PSYCHIC", "BUG", "ROCK", "GHOST",
+            "DRAGON", "DARK", "STEEL", "FAIRY",
+          ];
+
+         triples.forEach(triplePoke => {
+            const splitTypes = (typeString) => {
+                let types = [];
+                for (const type of TYPE_CHART) {
+                  if (typeString.includes(type)) {
+                    types.push(type);
+                  }
+                }
+                return types.join('/');
+              };
+          
+              // Update primary_type and secondary_type
+              triplePoke.primary_type = splitTypes(triplePoke.primary_type);
+              triplePoke.secondary_type = splitTypes(triplePoke.secondary_type);
+         })
+
+        //  const allPokemon = [...base];
+         const allPokemon = [...base, ...fusions, ...triples];
+
+       
 
         console.log("Extracting evolutions...");
         const allEvolutions = extractEvolutions(allPokemon);
