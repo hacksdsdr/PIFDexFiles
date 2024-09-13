@@ -106,7 +106,7 @@ async function createTables(db) {
 async function saveAbilities(db, abilities) {
     for (const ability of abilities) {
         await db.run(`
-            INSERT INTO abilities (id, real_name, real_description) 
+            INSERT OR REPLACE INTO abilities (id, real_name, real_description) 
             VALUES (?, ?, ?)
         `, [ability.id, ability.real_name, ability.real_description]);
     }
@@ -116,7 +116,7 @@ async function saveAbilities(db, abilities) {
 async function saveItems(db, items) {
     for (const item of items) {
         await db.run(`
-            INSERT INTO items (id, real_name, real_name_plural, pocket, price, real_description, field_use, battle_use, type, move) 
+            INSERT OR REPLACE INTO items (id, real_name, real_name_plural, pocket, price, real_description, field_use, battle_use, type, move) 
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `, [
             item.id, item.real_name, item.real_name_plural, item.pocket, 
@@ -130,7 +130,7 @@ async function saveItems(db, items) {
 async function saveMoves(db, moves) {
     for (const move of moves) {
         await db.run(`
-            INSERT INTO moves (id, real_name, function_code, base_damage, type, category, accuracy, total_pp, effect_chance, target, priority, flags, real_description) 
+            INSERT OR REPLACE INTO moves (id, real_name, function_code, base_damage, type, category, accuracy, total_pp, effect_chance, target, priority, flags, real_description) 
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `, [
             move.id, move.real_name, move.function_code, move.base_damage, 
@@ -145,7 +145,7 @@ async function saveMoves(db, moves) {
 async function saveTypes(db, types) {
     for (const type of types) {
         await db.run(`
-            INSERT INTO types (id, real_name, pseudo_type, special_type, weaknesses, resistances, immunities) 
+            INSERT OR REPLACE INTO types (id, real_name, pseudo_type, special_type, weaknesses, resistances, immunities) 
             VALUES (?, ?, ?, ?, ?, ?, ?)
         `, [
             type.id, type.real_name, type.pseudo_type, type.special_type,

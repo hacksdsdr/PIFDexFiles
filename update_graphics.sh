@@ -24,7 +24,7 @@ AUTOGEN_DIR="$GRAPHICS_DIR/autogen"
 CSV_FILE="$GRAPHICS_DIR/Sprite Credits.csv"
 
 # Create necessary directories
-mkdir -p "$BASE_DIR" "$FUSION_DIR" "$TRIPLE_DIR" "$AUTOGEN_DIR"
+mkdir -p "$BASE_DIR" "$FUSION_DIR" "$TRIPLE_DIR" "$AUTOGEN_DIR"  
 
 # Create a temporary directory
 mkdir -p "$TEMP_DIR"
@@ -36,10 +36,21 @@ git clone "$AUTOGEN_REPO" "$TEMP_DIR/autogen"
 echo "Cloning customsprites repository into temp directory..."
 git clone "$CUSTOM_REPO" "$TEMP_DIR/custom"
 
+# Clone the game repository
+echo "Cloning infinitefusion-e18 repository..."
+git clone "$GAME_REPO" "$TEMP_DIR/infinitefusion-e18"
+
+
+
+
 # Remove the .git directories to avoid any conflicts
 echo "Removing .git directories from cloned repositories..."
 rm -rf "$TEMP_DIR/autogen/.git"
 rm -rf "$TEMP_DIR/custom/.git"
+
+# Remove the .git directory from the game repository
+echo "Removing .git directory from game repository..."
+rm -rf "$TEMP_DIR/infinitefusion-e18/.git"
 
 # Copy CSV file
 echo "Copying CSV file..."
@@ -55,42 +66,37 @@ move_files() {
     find "$source_dir" -type f -print0 | xargs -0 -I {} mv {} "$target_dir"
 }
 
-# Move custom base, fusion, and triple sprites
-echo "Moving custom base sprites..."
-move_files "$TEMP_DIR/custom/Other/BaseSprites/" "$BASE_DIR"
-
-echo "Moving custom fusion sprites..."
-move_files "$TEMP_DIR/custom/CustomBattlers/" "$FUSION_DIR"
-
-echo "Moving custom triple sprites..."
-move_files "$TEMP_DIR/custom/Other/Triples/" "$TRIPLE_DIR"
-
-# Move all autogen sprites (flattening the structure)
-echo "Moving and flattening autogen sprites..."
-move_files "$TEMP_DIR/autogen" "$AUTOGEN_DIR"
-
-# Clone the game repository
-echo "Cloning infinitefusion-e18 repository..."
-git clone "$GAME_REPO" "$TEMP_DIR/infinitefusion-e18"
-
-# Remove the .git directory from the game repository
-echo "Removing .git directory from game repository..."
-rm -rf "$TEMP_DIR/infinitefusion-e18/.git"
-
-# Function to copy all graphics subfolders to the game directory
+# Function to copy all graphics subfolders to the game directory and preserve structure
 copy_graphics() {
     local source_dir=$1
     local target_dir=$2
 
     echo "Copying graphics from $source_dir to $target_dir..."
     
-    find "$source_dir" -type d -exec mkdir -p "$target_dir/{}" \;
-    find "$source_dir" -type f -print0 | xargs -0 -I {} cp {} "$target_dir"
+    # Find all directories and files, and copy them while maintaining the folder structure
+    rsync -av --progress "$source_dir/" "$target_dir/"
 }
 
-# Copy all graphics from the game repo to the game directory
-echo "Copying game graphics..."
-copy_graphics "$TEMP_DIR/infinitefusion-e18/Graphics" "$GAME_DIR"
+# Move custom base, fusion, and triple sprites
+echo "Moving custom base sprites..."
+copy_graphics "$TEMP_DIR/custom/Other/BaseSprites/" "$BASE_DIR"
+
+echo "Moving custom fusion sprites..."
+copy_graphics "$TEMP_DIR/custom/CustomBattlers/" "$FUSION_DIR"
+
+echo "Moving custom triple sprites..."
+copy_graphics "$TEMP_DIR/custom/Other/Triples/" "$TRIPLE_DIR"
+
+# Move all autogen sprites (flattening the structure)
+echo "Moving and flattening autogen sprites..."
+move_files "$TEMP_DIR/autogen" "$AUTOGEN_DIR"
+
+
+
+
+# Copy all graphics from the game repo to the game directory, preserving folder structure
+echo "Copying game graphics and preserving folder structure..."
+copy_graphics "$TEMP_DIR/infinitefusion-e18/Graphics" "./graphics/game"
 
 # Clean up the temporary directory
 echo "Cleaning up temporary files..."

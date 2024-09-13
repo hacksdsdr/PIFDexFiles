@@ -2,8 +2,7 @@
 
 # Array of tables to dump and upload
 #  tables=("artists" "sprites" "game_info")
- tables=("sprites")
-#  tables=("abilities" "artists" "game_info" "items" "moves" "sprites" "types")
+ tables=("abilities" "artists" "game_info" "items" "moves" "sprites" "types")
 
 # SQLite database file
 db_file="data.sqlite"
