@@ -231,8 +231,8 @@ async function main() {
               triplePoke.secondary_type = splitTypes(triplePoke.secondary_type);
          })
 
-         const allPokemon = [...base, ...triples];
-        // const allPokemon = [...base, ...fusions, ...triples];
+        //  const allPokemon = [...base, ...triples];
+        const allPokemon = [...base, ...fusions, ...triples];
 
        
 
@@ -247,7 +247,6 @@ async function main() {
             pokemon.evolves_from = evolutionData.evolvesFrom || [];
             pokemon.evolves_to = evolutionData.evolvesTo || [];
             pokemon.evolution_chain = evolutionData.evolutionChain || [];
-            if (pokemon.evolution_chain.length === 0) console.log('poke', pokemon.id)
         });
 
         console.log("Inserting Pokémon data into SQLite...");
