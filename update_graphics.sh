@@ -3,8 +3,10 @@
 # Define the directories
 GRAPHICS_DIR="./graphics"
 TEMP_DIR="./temp_graphics"
+GAME_DIR="./game"
 AUTOGEN_REPO="https://gitlab.com/pokemoninfinitefusion/autogen-fusion-sprites.git"
 CUSTOM_REPO="https://gitlab.com/pokemoninfinitefusion/customsprites.git"
+GAME_REPO="https://github.com/infinitefusion/infinitefusion-e18.git"
 
 # Delete the graphics and temp directories before starting to ensure clean slate
 echo "Deleting $GRAPHICS_DIR and $TEMP_DIR..."
@@ -66,6 +68,29 @@ move_files "$TEMP_DIR/custom/Other/Triples/" "$TRIPLE_DIR"
 # Move all autogen sprites (flattening the structure)
 echo "Moving and flattening autogen sprites..."
 move_files "$TEMP_DIR/autogen" "$AUTOGEN_DIR"
+
+# Clone the game repository
+echo "Cloning infinitefusion-e18 repository..."
+git clone "$GAME_REPO" "$TEMP_DIR/infinitefusion-e18"
+
+# Remove the .git directory from the game repository
+echo "Removing .git directory from game repository..."
+rm -rf "$TEMP_DIR/infinitefusion-e18/.git"
+
+# Function to copy all graphics subfolders to the game directory
+copy_graphics() {
+    local source_dir=$1
+    local target_dir=$2
+
+    echo "Copying graphics from $source_dir to $target_dir..."
+    
+    find "$source_dir" -type d -exec mkdir -p "$target_dir/{}" \;
+    find "$source_dir" -type f -print0 | xargs -0 -I {} cp {} "$target_dir"
+}
+
+# Copy all graphics from the game repo to the game directory
+echo "Copying game graphics..."
+copy_graphics "$TEMP_DIR/infinitefusion-e18/Graphics" "$GAME_DIR"
 
 # Clean up the temporary directory
 echo "Cleaning up temporary files..."
