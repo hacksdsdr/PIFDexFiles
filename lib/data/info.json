@@ -2358,7 +2358,7 @@
     "base": 470,
     "fusion": 220900,
     "triple": 20,
-    "totalCustomSprites": 118894
+    "totalCustomSprites": 0
   },
   "types": [
     "BUG",
@@ -3889,5 +3889,26 @@
     "WRINGOUT",
     "YAWN",
     "ZENHEADBUTT"
+  ],
+  "genderRatio": [
+    "AlwaysFemale",
+    "AlwaysMale",
+    "Female25Percent",
+    "Female50Percent",
+    "Female75Percent",
+    "FemaleOneEighth",
+    "Genderless"
+  ],
+  "habitat": [
+    "Cave",
+    "Forest",
+    "Grassland",
+    "Mountain",
+    "None",
+    "Rare",
+    "RoughTerrain",
+    "Sea",
+    "Urban",
+    "WatersEdge"
   ]
 }

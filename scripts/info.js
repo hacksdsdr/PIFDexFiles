@@ -15,13 +15,13 @@ async function getPokemonStats() {
         const totalSprites = await db.get('SELECT COUNT(*) as count FROM sprites');
 
         // 2. Total custom sprites
-        const totalCustomSprites = await db.all(`
-          SELECT COUNT(DISTINCT base_id) as totalCustomSprites
-          FROM artists
-          WHERE base_id LIKE '%[0-9]%'
-          AND base_id NOT LIKE '%[^0-9.]%'
-          AND base_id LIKE '%_.%' OR base_id LIKE '%';
-      `);
+        const totalCustomSprites = await db.get(`
+            SELECT COUNT(DISTINCT base_id) as totalCustomSprites
+            FROM artists
+            WHERE base_id LIKE '%[0-9]%'
+            AND base_id NOT LIKE '%[^0-9.]%'
+            AND (base_id LIKE '%_.%' OR base_id LIKE '%')
+        `);
 
         // 3. Custom sprites as head and body
         const basePokemons = await db.all(`
@@ -33,19 +33,16 @@ async function getPokemonStats() {
             const headCount = await db.get(`
                 SELECT COUNT(*) as count
                 FROM artists
-                WHERE sprite_id GLOB '${id}.[0-9]*' AND (sprite_type = 'main')
+                WHERE sprite_id GLOB '${id}.[0-9]*' AND sprite_type = 'main'
             `);
-            
+
             const bodyCount = await db.get(`
                 SELECT COUNT(*) as count
                 FROM artists
-                WHERE sprite_id GLOB '[0-9]*.${id}' AND (sprite_type = 'main')
+                WHERE sprite_id GLOB '[0-9]*.${id}' AND sprite_type = 'main'
             `);
-            
-            customSpritesJson[id] = { 
-                head: headCount.count, 
-                body: bodyCount.count 
-            };
+
+            customSpritesJson[id] = { head: headCount.count, body: bodyCount.count };
         }
 
         // 4. Base Pokemon names
@@ -79,6 +76,8 @@ async function getPokemonStats() {
         const movesSet = new Set();
         const tutorMovesSet = new Set();
         const eggMovesSet = new Set();
+        const genderRatioSet = new Set(); // Gender ratio set
+        const habitatSet = new Set(); // Habitat set
 
         for (const basePokemon of fusions) {
             typesSet.add(basePokemon.primary_type);
@@ -89,6 +88,7 @@ async function getPokemonStats() {
             if (basePokemon.abilities) {
                 basePokemon.abilities.forEach(ability => abilitiesSet.add(ability));
             }
+
             if (basePokemon.hidden_abilities) {
                 basePokemon.hidden_abilities.forEach(hiddenAbility => hiddenAbilitiesSet.add(hiddenAbility));
             }
@@ -100,11 +100,21 @@ async function getPokemonStats() {
             if (basePokemon.moves) {
                 basePokemon.moves.forEach(move => movesSet.add(move.move));
             }
+
             if (basePokemon.tutor_moves) {
                 basePokemon.tutor_moves.forEach(move => tutorMovesSet.add(move));
             }
+
             if (basePokemon.egg_moves) {
                 basePokemon.egg_moves.forEach(move => eggMovesSet.add(move));
+            }
+
+            if (basePokemon.gender_ratio) {
+                genderRatioSet.add(basePokemon.gender_ratio);
+            }
+
+            if (basePokemon.habitat) {
+                habitatSet.add(basePokemon.habitat);
             }
         }
 
@@ -118,6 +128,8 @@ async function getPokemonStats() {
         const moves = Array.from(movesSet).sort();
         const tutorMoves = Array.from(tutorMovesSet).sort();
         const eggMoves = Array.from(eggMovesSet).sort();
+        const genderRatio = Array.from(genderRatioSet).sort(); // Converted genderRatio
+        const habitat = Array.from(habitatSet).sort(); // Converted habitat
 
         // Combine all results
         const result = {
@@ -128,7 +140,7 @@ async function getPokemonStats() {
                 base: spriteTypeCounts.base_count,
                 fusion: spriteTypeCounts.fusion_count,
                 triple: spriteTypeCounts.triple_count,
-                totalCustomSprites: totalCustomSprites[0].totalCustomSprites
+                totalCustomSprites: totalCustomSprites.totalCustomSprites
             },
             types: types,
             abilities: abilities,
@@ -138,7 +150,9 @@ async function getPokemonStats() {
             shape: shape,
             moves: moves,
             tutorMoves: tutorMoves,
-            eggMoves: eggMoves
+            eggMoves: eggMoves,
+            genderRatio: genderRatio, // Added genderRatio
+            habitat: habitat // Added habitat
         };
 
         await fs.writeFile('/workspaces/PIFDexFiles/lib/data/info.json', JSON.stringify(result, null, 2));
@@ -159,7 +173,9 @@ async function getPokemonStats() {
                 shape JSON,
                 moves JSON,
                 tutor_moves JSON,
-                egg_moves JSON
+                egg_moves JSON,
+                gender_ratio JSON,  -- Added gender_ratio
+                habitat JSON         -- Added habitat
             )
         `);
 
@@ -171,8 +187,8 @@ async function getPokemonStats() {
             INSERT INTO game_info (
                 total_sprites, custom_sprites_head_body, base_pokemon_names, 
                 sprite_type_counts, types, abilities, hiddenAbilities, growth_rate, 
-                color, shape, moves, tutor_moves, egg_moves
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                color, shape, moves, tutor_moves, egg_moves, gender_ratio, habitat
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `);
 
         await stmt.run(
@@ -188,13 +204,13 @@ async function getPokemonStats() {
             JSON.stringify(result.shape),
             JSON.stringify(result.moves),
             JSON.stringify(result.tutorMoves),
-            JSON.stringify(result.eggMoves)
+            JSON.stringify(result.eggMoves),
+            JSON.stringify(result.genderRatio),  // Added gender_ratio
+            JSON.stringify(result.habitat)       // Added habitat
         );
 
         await stmt.finalize();
-
         console.log('Game data saved to game_info table in SQLite database.');
-
     } catch (error) {
         console.error('Error:', error);
     } finally {
